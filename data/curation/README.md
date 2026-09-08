@@ -41,6 +41,15 @@ bichig-curate stats data/curation/seed.csv
 # Track the first 200-pair milestone
 bichig-curate progress data/curation/seed.csv --goal 200 --coverage
 
+# Review queue
+bichig-curate list data/curation/seed.csv --status review --limit 20
+
+# Verify one record after human review
+bichig-curate set-status data/curation/seed.csv b000001 verified --reviewer "name"
+
+# Strict metadata/conflict audit
+bichig-curate audit data/curation/seed.csv
+
 # Export only verified rows for training
 bichig-curate export data/curation/seed.csv --out data/seed.tsv
 bichig-validate-data data/seed.tsv
@@ -64,3 +73,7 @@ Do not make the first seed corpus 100 random easy words. Deliberately cover:
 `--coverage` shows a suggested distribution across those kinds of examples. It is a guideline rather than a linguistic rule or a hard training requirement.
 
 For the first smoke test, a small, fully verified corpus is better than a large noisy one.
+
+## Licensing note
+
+Do not scrape or copy dictionary databases whose terms prohibit reuse. Keep provenance and license fields explicit. A record should become `verified` only when both linguistic correctness and reuse permission are clear.
