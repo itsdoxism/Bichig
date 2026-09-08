@@ -5,6 +5,7 @@ import torch
 
 from bichig.config import ModelConfig
 from bichig.data import ParallelDataset, read_pairs
+from bichig.infer import load_model_and_tokenizer, translate
 from bichig.model import BichigTransformer
 from bichig.tokenizer import CharTokenizer
 
@@ -51,3 +52,8 @@ def test_parallel_dataset_reads_tsv():
         assert src[-1].item() == tok.eos_id
         assert tgt[0].item() == tok.bos_id
         assert tgt[-1].item() == tok.eos_id
+
+
+def test_evaluation_inference_helpers_are_available():
+    assert callable(load_model_and_tokenizer)
+    assert callable(translate)
