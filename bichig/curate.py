@@ -2,7 +2,7 @@ import argparse
 import csv
 import json
 import unicodedata
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 
@@ -21,6 +21,14 @@ FIELDS = [
 
 ALLOWED_STATUS = {"draft", "review", "verified", "rejected"}
 ALLOWED_DIFFICULTY = {"easy", "medium", "hard"}
+RECOMMENDED_SEED_CATEGORIES = {
+    "word": 30,
+    "suffix": 25,
+    "phrase": 25,
+    "sentence": 40,
+    "ambiguous": 20,
+    "name": 10,
+}
 
 
 @dataclass
@@ -64,6 +72,32 @@ def write_records(path: Path, records: list[Record]) -> None:
             writer.writerow(asdict(record))
 
 
+def summarize(records: list[Record]) -> dict:
+    summary = {
+        "total": len(records),
+        "status": {},
+        "difficulty": {},
+        "category": {},
+        "missing": {
+            "provenance": 0,
+            "license": 0,
+            "reviewer_on_verified": 0,
+        },
+    }
+    for record in records:
+        for key in ("status", "difficulty", "category"):
+            bucket = summary[key]
+            value = getattr(record, key) or "(empty)"
+            bucket[value] = bucket.get(value, 0) + 1
+        if not record.provenance.strip():
+            summary["missing"]["provenance"] += 1
+        if not record.license.strip():
+            summary["missing"]["license"] += 1
+        if record.status == "verified" and not record.reviewer.strip():
+            summary["missing"]["reviewer_on_verified"] += 1
+    return summary
+
+
 def cmd_init(args: argparse.Namespace) -> None:
     path = Path(args.file)
     if path.exists() and not args.force:
@@ -102,18 +136,47 @@ def cmd_add(args: argparse.Namespace) -> None:
 
 def cmd_stats(args: argparse.Namespace) -> None:
     records = read_records(Path(args.file))
-    summary = {
-        "total": len(records),
-        "status": {},
-        "difficulty": {},
-        "category": {},
-    }
-    for record in records:
-        for key in ("status", "difficulty", "category"):
-            bucket = summary[key]
-            value = getattr(record, key) or "(empty)"
-            bucket[value] = bucket.get(value, 0) + 1
-    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    print(json.dumps(summarize(records), ensure_ascii=False, indent=2))
+
+
+def cmd_progress(args: argparse.Namespace) -> None:
+    records = read_records(Path(args.file))
+    summary = summarize(records)
+    verified = summary["status"].get("verified", 0)
+    goal = max(1, args.goal)
+    percent = min(100.0, verified / goal * 100.0)
+
+    print(f"Seed corpus: {verified}/{goal} verified ({percent:.1f}%)")
+    print(f"Total records: {summary['total']}")
+    print(
+        "Queue: "
+        f"draft={summary['status'].get('draft', 0)} "
+        f"review={summary['status'].get('review', 0)} "
+        f"rejected={summary['status'].get('rejected', 0)}"
+    )
+
+    bar_width = 30
+    filled = round(bar_width * min(verified, goal) / goal)
+    print("[" + "#" * filled + "-" * (bar_width - filled) + "]")
+
+    if args.coverage:
+        verified_by_category = {}
+        for record in records:
+            if record.status == "verified":
+                key = record.category or "(empty)"
+                verified_by_category[key] = verified_by_category.get(key, 0) + 1
+        print("\nRecommended seed coverage (guideline, not a hard rule):")
+        for category, target in RECOMMENDED_SEED_CATEGORIES.items():
+            count = verified_by_category.get(category, 0)
+            marker = "ok" if count >= target else "--"
+            print(f"  {category:10s} {count:3d}/{target:<3d} {marker}")
+
+    missing = summary["missing"]
+    if any(missing.values()):
+        print("\nMetadata gaps:")
+        print(f"  missing provenance: {missing['provenance']}")
+        print(f"  missing license: {missing['license']}")
+        print(f"  verified without reviewer: {missing['reviewer_on_verified']}")
 
 
 def cmd_export(args: argparse.Namespace) -> None:
@@ -168,6 +231,12 @@ def build_parser() -> argparse.ArgumentParser:
     stats = sub.add_parser("stats")
     stats.add_argument("file")
     stats.set_defaults(func=cmd_stats)
+
+    progress = sub.add_parser("progress")
+    progress.add_argument("file")
+    progress.add_argument("--goal", type=int, default=200)
+    progress.add_argument("--coverage", action="store_true")
+    progress.set_defaults(func=cmd_progress)
 
     export = sub.add_parser("export")
     export.add_argument("file")
