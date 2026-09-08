@@ -57,3 +57,18 @@ def test_parallel_dataset_reads_tsv():
 def test_evaluation_inference_helpers_are_available():
     assert callable(load_model_and_tokenizer)
     assert callable(translate)
+
+
+def test_curation_summary_and_progress_data():
+    from bichig.curate import Record, summarize
+
+    records = [
+        Record(id="b000001", source="Монгол", target="ᠮᠣᠩᠭᠣᠯ", status="verified", category="word", reviewer="human"),
+        Record(id="b000002", source="хэл", target="ᠬᠡᠯᠡ", status="review", category="word"),
+    ]
+    summary = summarize(records)
+    assert summary["total"] == 2
+    assert summary["status"]["verified"] == 1
+    assert summary["status"]["review"] == 1
+    assert summary["category"]["word"] == 2
+    assert summary["missing"]["reviewer_on_verified"] == 0
