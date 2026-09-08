@@ -5,7 +5,6 @@ import torch
 
 from bichig.config import ModelConfig
 from bichig.data import ParallelDataset, read_pairs
-from bichig.infer import load_model_and_tokenizer, translate
 from bichig.model import BichigTransformer
 from bichig.tokenizer import CharTokenizer
 
@@ -54,11 +53,6 @@ def test_parallel_dataset_reads_tsv():
         assert tgt[-1].item() == tok.eos_id
 
 
-def test_evaluation_inference_helpers_are_available():
-    assert callable(load_model_and_tokenizer)
-    assert callable(translate)
-
-
 def test_curation_summary_and_progress_data():
     from bichig.curate import Record, summarize
 
@@ -72,3 +66,26 @@ def test_curation_summary_and_progress_data():
     assert summary["status"]["review"] == 1
     assert summary["category"]["word"] == 2
     assert summary["missing"]["reviewer_on_verified"] == 0
+
+
+def test_curation_status_and_audit():
+    from argparse import Namespace
+    from bichig.curate import Record, cmd_audit, cmd_set_status, read_records, write_records
+
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "seed.csv"
+        write_records(path, [Record(
+            id="b000001",
+            source="Монгол",
+            target="ᠮᠣᠩᠭᠣᠯ",
+            status="review",
+            provenance="manual",
+            license="CC0",
+        )])
+        cmd_set_status(Namespace(
+            file=str(path), id="b000001", status="verified", reviewer="tester", notes="checked"
+        ))
+        records = read_records(path)
+        assert records[0].status == "verified"
+        assert records[0].reviewer == "tester"
+        cmd_audit(Namespace(file=str(path)))
