@@ -15,6 +15,7 @@ bichig-train = "bichig.train:main"
 bichig-infer = "bichig.infer:main"
 bichig-eval = "bichig.evaluate:main"
 bichig-validate-data = "bichig.validate_data:main"
+bichig-prepare-data = "bichig.prepare_data:main"
 
 [tool.setuptools.packages.find]
 include = ["bichig*"]
