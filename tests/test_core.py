@@ -29,8 +29,10 @@ def test_model_forward_shape():
         max_len=32,
     )
     model = BichigTransformer(len(tok), tok.pad_id, cfg)
-    src = torch.tensor([[tok.bos_id, *tok.encode("абв"), tok.eos_id]], dtype=torch.long)
-    tgt = torch.tensor([[tok.bos_id, *tok.encode("ᠠᠪᠸ"), tok.eos_id]], dtype=torch.long)
+    src_ids = tok.encode("абв", add_bos=True, add_eos=True)
+    tgt_ids = tok.encode("ᠠᠪᠸ", add_bos=True, add_eos=True)
+    src = torch.tensor([src_ids], dtype=torch.long)
+    tgt = torch.tensor([tgt_ids], dtype=torch.long)
     logits = model(src, tgt[:, :-1])
     assert logits.shape == (1, tgt.size(1) - 1, len(tok))
     assert torch.isfinite(logits).all()
