@@ -2,9 +2,15 @@
 
 Bichig keeps human-reviewed corpus records separate from model-ready TSV files.
 
-## Record format
+## Seed template
 
-Use `bichig-curate` with a CSV file containing:
+The repository includes an empty ready-to-fill template:
+
+```text
+data/curation/seed.csv
+```
+
+Each row contains:
 
 - `id` — stable record identifier
 - `source` — Cyrillic Mongolian input
@@ -20,8 +26,7 @@ Use `bichig-curate` with a CSV file containing:
 ## Workflow
 
 ```bash
-bichig-curate init data/curation/seed.csv
-
+# Add a candidate pair
 bichig-curate add data/curation/seed.csv \
   --source "..." \
   --target "..." \
@@ -30,8 +35,13 @@ bichig-curate add data/curation/seed.csv \
   --category sentence \
   --provenance "manual"
 
+# See detailed counts and metadata gaps
 bichig-curate stats data/curation/seed.csv
 
+# Track the first 200-pair milestone
+bichig-curate progress data/curation/seed.csv --goal 200 --coverage
+
+# Export only verified rows for training
 bichig-curate export data/curation/seed.csv --out data/seed.tsv
 bichig-validate-data data/seed.tsv
 bichig-smoke --data data/seed.tsv
@@ -50,5 +60,7 @@ Do not make the first seed corpus 100 random easy words. Deliberately cover:
 5. ambiguous Cyrillic forms resolved by context
 6. names and loanwords, but keep these separate from the core linguistic benchmark
 7. complete short sentences
+
+`--coverage` shows a suggested distribution across those kinds of examples. It is a guideline rather than a linguistic rule or a hard training requirement.
 
 For the first smoke test, a small, fully verified corpus is better than a large noisy one.
