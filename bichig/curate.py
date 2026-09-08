@@ -179,6 +179,82 @@ def cmd_progress(args: argparse.Namespace) -> None:
         print(f"  verified without reviewer: {missing['reviewer_on_verified']}")
 
 
+def find_record(records: list[Record], record_id: str) -> Record:
+    for record in records:
+        if record.id == record_id:
+            return record
+    raise SystemExit(f"record not found: {record_id}")
+
+
+def cmd_list(args: argparse.Namespace) -> None:
+    records = read_records(Path(args.file))
+    statuses = set(args.status or [])
+    rows = [r for r in records if not statuses or r.status in statuses]
+    if args.category:
+        rows = [r for r in rows if r.category == args.category]
+    if args.limit:
+        rows = rows[: args.limit]
+    for r in rows:
+        print(f"{r.id}\t{r.status}\t{r.difficulty}\t{r.category}\t{r.source}\t{r.target}")
+    print(f"shown {len(rows)} record(s)")
+
+
+def cmd_set_status(args: argparse.Namespace) -> None:
+    path = Path(args.file)
+    records = read_records(path)
+    record = find_record(records, args.id)
+    if args.status not in ALLOWED_STATUS:
+        raise SystemExit(f"invalid status: {args.status}")
+    if args.status == "verified" and not args.reviewer and not record.reviewer:
+        raise SystemExit("--reviewer is required when verifying a record")
+    record.status = args.status
+    if args.reviewer:
+        record.reviewer = args.reviewer
+    if args.notes:
+        record.notes = (record.notes + " | " if record.notes else "") + args.notes
+    write_records(path, records)
+    print(f"{record.id}: status={record.status}")
+
+
+def cmd_audit(args: argparse.Namespace) -> None:
+    records = read_records(Path(args.file))
+    errors = []
+    seen_ids = set()
+    seen_pairs = set()
+    verified_targets = {}
+    for r in records:
+        if r.id in seen_ids:
+            errors.append(f"{r.id}: duplicate id")
+        seen_ids.add(r.id)
+        if r.status not in ALLOWED_STATUS:
+            errors.append(f"{r.id}: invalid status {r.status!r}")
+        if r.difficulty not in ALLOWED_DIFFICULTY:
+            errors.append(f"{r.id}: invalid difficulty {r.difficulty!r}")
+        source, target = normalize(r.source), normalize(r.target)
+        if not source or not target:
+            errors.append(f"{r.id}: empty source/target")
+        pair = (source, target)
+        if pair in seen_pairs:
+            errors.append(f"{r.id}: duplicate pair")
+        seen_pairs.add(pair)
+        if r.status == "verified":
+            if not r.provenance.strip():
+                errors.append(f"{r.id}: verified record missing provenance")
+            if not r.license.strip():
+                errors.append(f"{r.id}: verified record missing license")
+            if not r.reviewer.strip():
+                errors.append(f"{r.id}: verified record missing reviewer")
+            prev = verified_targets.get(source)
+            if prev is not None and prev != target:
+                errors.append(f"{r.id}: conflicting verified target for {source!r}")
+            verified_targets[source] = target
+    if errors:
+        for error in errors:
+            print(f"ERROR {error}")
+        raise SystemExit(f"audit failed: {len(errors)} issue(s)")
+    print(f"audit ok: {len(records)} record(s), {len(verified_targets)} verified source(s)")
+
+
 def cmd_export(args: argparse.Namespace) -> None:
     records = read_records(Path(args.file))
     verified = [r for r in records if r.status == "verified"]
@@ -237,6 +313,25 @@ def build_parser() -> argparse.ArgumentParser:
     progress.add_argument("--goal", type=int, default=200)
     progress.add_argument("--coverage", action="store_true")
     progress.set_defaults(func=cmd_progress)
+
+    listing = sub.add_parser("list")
+    listing.add_argument("file")
+    listing.add_argument("--status", action="append", choices=sorted(ALLOWED_STATUS))
+    listing.add_argument("--category")
+    listing.add_argument("--limit", type=int, default=20)
+    listing.set_defaults(func=cmd_list)
+
+    set_status = sub.add_parser("set-status")
+    set_status.add_argument("file")
+    set_status.add_argument("id")
+    set_status.add_argument("status", choices=sorted(ALLOWED_STATUS))
+    set_status.add_argument("--reviewer", default="")
+    set_status.add_argument("--notes", default="")
+    set_status.set_defaults(func=cmd_set_status)
+
+    audit = sub.add_parser("audit")
+    audit.add_argument("file")
+    audit.set_defaults(func=cmd_audit)
 
     export = sub.add_parser("export")
     export.add_argument("file")
