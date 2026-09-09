@@ -1,0 +1,8 @@
+{
+  "raw_rows": 177,
+  "unique_pairs": 154,
+  "exact_duplicates": 23,
+  "conflicting_sources": 3,
+  "conflicting_pairs": 7,
+  "clean_pairs": 147
+}
