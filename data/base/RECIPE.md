@@ -8,13 +8,19 @@ The first useful Bichig Base milestone is **clean Mongolian Cyrillic language mo
    - `bichig-base-import ...`
    - `bichig-base-wiki ...`
 2. Keep provenance/license reports beside each raw extraction.
-3. Merge raw `.txt` files and run:
+3. Build a source manifest and validate it:
 
 ```bash
-bichig-base-corpus data/base/raw/*.txt --out data/base/processed
+bichig-base-manifest data/base/manifest.json
 ```
 
-4. Train only on `train.txt`; choose checkpoints from `valid.txt`.
+4. Merge/clean/deduplicate through the manifest:
+
+```bash
+bichig-base-corpus --manifest data/base/manifest.json --out data/base/processed
+```
+
+5. Train only on `train.txt`; choose checkpoints from `valid.txt`.
 
 ```bash
 bichig-base-train \
@@ -51,3 +57,7 @@ Track held-out validation perplexity and qualitative completion together. A lowe
 - `Өнөөдөр цаг агаар`
 
 The model should gradually produce grammatical continuations before chat tuning begins.
+
+## Source manifest rule
+
+Every bulk source should carry `name`, `path`, `license`, `kind`, and `language` metadata. Enabled sources with `unknown`/`unspecified` license are rejected by default. Use `--allow-unknown-license` only for an explicit private experiment; do not silently mix such data into a redistributable base corpus.
