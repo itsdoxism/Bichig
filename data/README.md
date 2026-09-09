@@ -76,7 +76,7 @@ These are intentionally simple baseline metrics. Later versions should add word/
 
 ## First full-corpus experiment
 
-The first larger experiment uses the 177-row Apache-2.0 `suwanpan/mongolian-script-text` dataset snapshot. The raw snapshot is kept locally under `data/raw/hf_suwanpan/`, while the reproducible import report and cleaned/split outputs can be committed independently.
+The repository includes a reproducible snapshot of the 177-row Apache-2.0 `suwanpan/mongolian-script-text` dataset under `data/raw/hf_suwanpan/`.
 
 ```bash
 bichig-import-jsonl data/raw/hf_suwanpan/*.jsonl \
@@ -92,3 +92,20 @@ bichig-prepare-data data/full-clean.tsv \
 ```
 
 For the current snapshot, 177 raw rows become 154 unique pairs. Three Cyrillic sources have conflicting Traditional-script targets; quarantining all of those mappings leaves 147 clean pairs, split into 117 train / 15 valid / 15 test.
+
+## Bichig Base Cyrillic corpus
+
+`Bichig Base` learns Mongolian itself from plain Cyrillic text before chat/instruction tuning.
+Keep source material in `data/base/raw/`, then build deterministic, deduplicated train/validation files:
+
+```bash
+bichig-base-corpus data/base/raw/*.txt --out data/base/processed
+bichig-base-train \
+  --data data/base/processed/train.txt \
+  --valid-data data/base/processed/valid.txt \
+  --out runs/base-v0
+```
+
+The corpus builder normalizes Unicode/whitespace, removes exact duplicates, rejects lines that are mostly non-Cyrillic, filters pathological lengths, and writes `report.json`. The split happens after deduplication so exact rows cannot leak between train and validation.
+
+For the language-model corpus, prefer broad natural Mongolian: conversations/transcripts, explanatory prose, literature, encyclopedic writing, instructions, and well-edited contemporary text. Do not make the corpus almost entirely news because the model will learn a narrow news style.
