@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "name": "tugstugi-news-700m",
+      "path": "data/base/raw/tugstugi-news-research.txt",
+      "license": "unknown",
+      "kind": "news",
+      "language": "mn-Cyrl",
+      "enabled": true,
+      "usage": "research-only",
+      "redistribute": false,
+      "notes": "Private Bichig pretraining experiment only. Source discovered via tugstugi/mongolian-bert. Do not redistribute the raw corpus until its underlying license is verified."
+    }
+  ]
+}
