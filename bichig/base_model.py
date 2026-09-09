@@ -36,14 +36,29 @@ class CausalBlockModel(nn.Module):
         self.blocks = nn.TransformerEncoder(layer, num_layers=config.layers)
         self.norm = nn.LayerNorm(config.d_model)
         self.lm_head = nn.Linear(config.d_model, vocab_size, bias=False)
+        self.apply(self._init_weights)
         self.lm_head.weight = self.token.weight
+        with torch.no_grad():
+            self.token.weight[pad_id].zero_()
+
+    @staticmethod
+    def _init_weights(module):
+        if isinstance(module, nn.Linear):
+            nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        elif isinstance(module, nn.LayerNorm):
+            nn.init.ones_(module.weight)
+            nn.init.zeros_(module.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         _, t = x.shape
         if t > self.config.max_len:
             raise ValueError(f"sequence length {t} exceeds max_len={self.config.max_len}")
         pos = torch.arange(t, device=x.device).unsqueeze(0)
-        h = self.token(x) * math.sqrt(self.config.d_model) + self.pos(pos)
+        h = self.token(x) + self.pos(pos)
         causal = torch.triu(torch.ones(t, t, dtype=torch.bool, device=x.device), diagonal=1)
         padding = x.eq(self.pad_id)
         h = self.blocks(h, mask=causal, src_key_padding_mask=padding)
