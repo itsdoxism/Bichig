@@ -177,3 +177,79 @@ def test_base_corpus_clean_and_split():
     train, valid = split_texts(clean, valid_ratio=0.5, seed=422)
     assert len(train) == 1 and len(valid) == 1
     assert set(train).isdisjoint(valid)
+
+
+def test_wiki_markup_extraction():
+    from bichig.base_wiki import sentence_rows
+
+    raw = """'''Монгол хэл''' бол [[Монгол Улс|Монгол Улсын]] албан ёсны хэл юм.
+{{Infobox language|name=Монгол}}
+== Түүх ==
+Монгол хэл олон зууны түүхтэй. <ref>source</ref>"""
+    rows = sentence_rows(raw)
+    assert "Монгол хэл бол Монгол Улсын албан ёсны хэл юм." in rows
+    assert "Монгол хэл олон зууны түүхтэй." in rows
+    assert not any("Infobox" in row or "<ref>" in row for row in rows)
+
+
+def test_base_tokenizer_separates_punctuation_and_learns_suffixes():
+    from bichig.base_tokenizer import HybridTokenizer
+
+    texts = [
+        "сургуульд явна.",
+        "гэрт явна.",
+        "ажилд явна!",
+        "номд тэмдэглэл хийв.",
+    ] * 4
+    tok = HybridTokenizer.build(
+        texts,
+        min_word_freq=99,
+        min_suffix_freq=2,
+        max_suffix_tokens=32,
+    )
+    encoded = tok.encode("сургуульд явна.")
+    assert tok.decode(encoded) == "сургуульд явна."
+    assert any(t == "<p:.>" for t in tok.itos)
+    assert any(t.startswith("<suf:") for t in tok.itos)
+
+
+def test_lm_dataset_stride_reduces_overlapping_windows():
+    from bichig.base_train import LMDataset
+
+    ids = list(range(101))
+    dense = LMDataset(ids, seq_len=10, stride=1)
+    packed = LMDataset(ids, seq_len=10, stride=10)
+    assert len(dense) == 91
+    assert len(packed) == 10
+    x, y = packed[1]
+    assert x.tolist()[0] == 10
+    assert y.tolist()[0] == 11
+
+
+def test_base_model_initial_loss_is_sane():
+    from torch import nn
+    from bichig.base_model import BaseConfig, CausalBlockModel
+    from bichig.base_tokenizer import HybridTokenizer
+
+    tok = HybridTokenizer.build(["Монгол хэл сайхан.", "Монгол хүн ярьж байна."], min_word_freq=1)
+    cfg = BaseConfig(d_model=32, nhead=4, layers=1, ffn=64, dropout=0.0, max_len=16)
+    model = CausalBlockModel(len(tok), tok.pad_id, cfg)
+    ids = tok.encode("Монгол хэл сайхан.")
+    x = torch.tensor([ids[:-1]], dtype=torch.long)
+    y = torch.tensor([ids[1:]], dtype=torch.long)
+    logits = model(x)
+    loss = nn.CrossEntropyLoss()(logits.reshape(-1, len(tok)), y.reshape(-1))
+    assert loss.item() < 10.0
+
+
+def test_base_import_jsonl_and_tsv():
+    from bichig.base_import import extract
+    import json
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        j = td / "rows.jsonl"
+        j.write_text(json.dumps({"meta": {"text": "Монгол хэл"}}, ensure_ascii=False) + "\n", encoding="utf-8")
+        t = td / "rows.tsv"
+        t.write_text("sentence\nМонгол Улс\n", encoding="utf-8")
+        assert extract(j, "jsonl", "meta.text") == ["Монгол хэл"]
+        assert extract(t, "tsv", "sentence") == ["Монгол Улс"]
