@@ -1,4 +1,5 @@
 import argparse
+import math
 import random
 from pathlib import Path
 
@@ -84,6 +85,34 @@ def sample_corpus(path: str | Path, max_lines: int, seed: int) -> list[str]:
     return sample
 
 
+def learning_rate_for_update(
+    base_lr: float,
+    update_index: int,
+    warmup_steps: int = 0,
+    cosine_steps: int = 0,
+    min_lr_ratio: float = 0.1,
+) -> float:
+    """Warm up linearly, then optionally decay with cosine toward base_lr * min_lr_ratio."""
+    if base_lr <= 0:
+        raise ValueError("base_lr must be > 0")
+    if warmup_steps < 0 or cosine_steps < 0:
+        raise ValueError("schedule steps must be >= 0")
+    if not 0.0 <= min_lr_ratio <= 1.0:
+        raise ValueError("min_lr_ratio must be between 0 and 1")
+    if warmup_steps and update_index < warmup_steps:
+        return base_lr * (update_index + 1) / warmup_steps
+    if cosine_steps <= 0:
+        return base_lr
+    progress = min(max((update_index - warmup_steps) / cosine_steps, 0.0), 1.0)
+    multiplier = min_lr_ratio + (1.0 - min_lr_ratio) * 0.5 * (1.0 + math.cos(math.pi * progress))
+    return base_lr * multiplier
+
+
+def set_optimizer_lr(opt, lr: float) -> None:
+    for group in opt.param_groups:
+        group["lr"] = lr
+
+
 def parse_args():
     p = argparse.ArgumentParser(description="Train Bichig Base next-token model from scratch")
     p.add_argument("--data", required=True)
@@ -92,11 +121,16 @@ def parse_args():
     p.add_argument("--epochs", type=int, default=10)
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--lr", type=float, default=3e-4)
+    p.add_argument("--weight-decay", type=float, default=0.1)
+    p.add_argument("--grad-accum", type=int, default=1, help="micro-batches per optimizer update")
+    p.add_argument("--warmup-steps", type=int, default=0, help="optimizer updates for linear LR warmup")
+    p.add_argument("--cosine-steps", type=int, default=0, help="optimizer updates for cosine LR decay; 0 keeps LR constant after warmup")
+    p.add_argument("--min-lr-ratio", type=float, default=0.1, help="final cosine LR as a fraction of --lr")
     p.add_argument("--seq-len", type=int, default=64)
     p.add_argument("--stride", type=int, help="in-memory training window stride; defaults to seq-len")
     p.add_argument("--streaming", action="store_true", help="stream/pack corpus from disk instead of holding all token IDs in RAM")
     p.add_argument("--workers", type=int, default=0, help="DataLoader workers (streaming worker-shards by line number)")
-    p.add_argument("--steps-per-epoch", type=int, help="optional cap for very large streaming corpora")
+    p.add_argument("--steps-per-epoch", type=int, help="optional cap for very large streaming corpora; counts micro-batches")
     p.add_argument("--vocab-lines", type=int, default=200000, help="reservoir-sampled lines used to learn tokenizer vocabulary in streaming mode")
     p.add_argument("--d-model", type=int, default=192)
     p.add_argument("--nhead", type=int, default=6)
@@ -143,6 +177,8 @@ def build_loaders(a, tok):
 
 def main():
     a = parse_args()
+    if a.grad_accum < 1:
+        raise SystemExit("--grad-accum must be >= 1")
     random.seed(a.seed)
     torch.manual_seed(a.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -172,52 +208,105 @@ def main():
     else:
         cfg = BaseConfig(d_model=a.d_model, nhead=a.nhead, layers=a.layers, ffn=a.ffn, dropout=a.dropout, max_len=a.seq_len)
     model = CausalBlockModel(len(tok), tok.pad_id, cfg).to(device)
-    opt = torch.optim.AdamW(model.parameters(), lr=a.lr)
+    opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=a.weight_decay)
     start_epoch = 1
     best_metric = float("inf")
+    global_update = 0
     if resume_ckpt:
         model.load_state_dict(resume_ckpt["model"])
         if "optimizer" in resume_ckpt:
             opt.load_state_dict(resume_ckpt["optimizer"])
             for group in opt.param_groups:
-                group["lr"] = a.lr
+                group["weight_decay"] = a.weight_decay
         start_epoch = int(resume_ckpt.get("epoch", 0)) + 1
         best_metric = float(resume_ckpt.get("best_val_loss", resume_ckpt.get("val_loss", float("inf"))))
-        print(f"resumed={a.resume} from_epoch={start_epoch-1} best_val_loss={best_metric:.4f}")
+        global_update = int(resume_ckpt.get("global_update", 0))
+        print(f"resumed={a.resume} from_epoch={start_epoch-1} global_update={global_update} best_val_loss={best_metric:.4f}")
     loss_fn = nn.CrossEntropyLoss(ignore_index=tok.pad_id)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     tok.save(out / "vocab.json")
 
     detail = "streaming=true" if a.streaming else " ".join(f"{k}={v}" for k, v in stats.items())
-    print(f"device={device} {detail} vocab={len(tok)} params={sum(p.numel() for p in model.parameters()):,}")
+    effective_batch = a.batch_size * a.grad_accum
+    print(
+        f"device={device} {detail} vocab={len(tok)} params={sum(p.numel() for p in model.parameters()):,} "
+        f"grad_accum={a.grad_accum} effective_batch={effective_batch} weight_decay={a.weight_decay}"
+    )
 
     for epoch in range(start_epoch, start_epoch + a.epochs):
         model.train()
         total = 0.0
-        steps = 0
+        micro_steps = 0
+        updates_this_epoch = 0
+        opt.zero_grad(set_to_none=True)
+        pending = 0
         for x, y in train_loader:
             x, y = x.to(device), y.to(device)
-            opt.zero_grad(set_to_none=True)
             logits = model(x)
-            loss = loss_fn(logits.reshape(-1, logits.size(-1)), y.reshape(-1))
-            loss.backward()
+            raw_loss = loss_fn(logits.reshape(-1, logits.size(-1)), y.reshape(-1))
+            (raw_loss / a.grad_accum).backward()
+            total += raw_loss.item()
+            micro_steps += 1
+            pending += 1
+
+            should_update = pending >= a.grad_accum
+            reached_cap = bool(a.steps_per_epoch and micro_steps >= a.steps_per_epoch)
+            if should_update or reached_cap:
+                lr = learning_rate_for_update(a.lr, global_update, a.warmup_steps, a.cosine_steps, a.min_lr_ratio)
+                set_optimizer_lr(opt, lr)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                opt.step()
+                opt.zero_grad(set_to_none=True)
+                global_update += 1
+                updates_this_epoch += 1
+                pending = 0
+            if reached_cap:
+                break
+
+        if pending:
+            lr = learning_rate_for_update(a.lr, global_update, a.warmup_steps, a.cosine_steps, a.min_lr_ratio)
+            set_optimizer_lr(opt, lr)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()
-            total += loss.item()
-            steps += 1
-            if a.steps_per_epoch and steps >= a.steps_per_epoch:
-                break
-        if steps == 0:
+            opt.zero_grad(set_to_none=True)
+            global_update += 1
+            updates_this_epoch += 1
+
+        if micro_steps == 0:
             raise SystemExit("no training windows produced; reduce --seq-len or provide more corpus text")
-        avg = total / steps
+        avg = total / micro_steps
         val = evaluate_loss(model, valid_loader, loss_fn, device) if valid_loader is not None else avg
-        print(f"epoch={epoch:03d} steps={steps} loss={avg:.4f} ppl={math_exp(avg):.2f} val_loss={val:.4f} val_ppl={math_exp(val):.2f}")
+        current_lr = opt.param_groups[0]["lr"]
+        print(
+            f"epoch={epoch:03d} micro_steps={micro_steps} updates={updates_this_epoch} global_update={global_update} "
+            f"lr={current_lr:.6g} loss={avg:.4f} ppl={math_exp(avg):.2f} "
+            f"val_loss={val:.4f} val_ppl={math_exp(val):.2f}"
+        )
         ckpt = {
-            "model": model.state_dict(), "config": cfg.to_dict(), "vocab": tok.itos,
-            "epoch": epoch, "loss": avg, "val_loss": val, "best_val_loss": min(best_metric, val),
+            "format_version": 2,
+            "model": model.state_dict(),
+            "config": cfg.to_dict(),
+            "vocab": tok.itos,
+            "epoch": epoch,
+            "global_update": global_update,
+            "loss": avg,
+            "val_loss": val,
+            "best_val_loss": min(best_metric, val),
             "optimizer": opt.state_dict(),
-            "training": {"streaming": a.streaming, "seq_len": a.seq_len, "vocab_lines": a.vocab_lines},
+            "training": {
+                "streaming": a.streaming,
+                "seq_len": a.seq_len,
+                "vocab_lines": a.vocab_lines,
+                "batch_size": a.batch_size,
+                "grad_accum": a.grad_accum,
+                "effective_batch": effective_batch,
+                "base_lr": a.lr,
+                "weight_decay": a.weight_decay,
+                "warmup_steps": a.warmup_steps,
+                "cosine_steps": a.cosine_steps,
+                "min_lr_ratio": a.min_lr_ratio,
+            },
         }
         torch.save(ckpt, out / "last.pt")
         if val < best_metric:
@@ -242,7 +331,6 @@ def evaluate_loss(model, loader, loss_fn, device):
 
 
 def math_exp(x):
-    import math
     return math.exp(min(x, 20))
 
 
