@@ -111,3 +111,18 @@ It scores each grammatical/sensible sentence against a deliberately malformed co
 ## Source manifest rule
 
 Every bulk source should carry `name`, `path`, `license`, `kind`, `language`, `usage`, and `redistribute` metadata. Enabled sources with `unknown`/`unspecified` license are rejected by default. Use `--allow-unknown-license` only for an explicit private experiment; do not silently mix such data into a redistributable base corpus.
+
+## One-command research experiment
+
+After the research manifest points at available raw text, run the whole clean → train → eval → grammar-benchmark flow with:
+
+```bash
+bichig-base-run \
+  --manifest data/base/manifest.research.json \
+  --processed data/base/processed-research \
+  --run-dir runs/base-v1 \
+  --epochs 3 \
+  --steps-per-epoch 1000
+```
+
+Resume an interrupted or continued experiment with `--resume`. Bichig reuses `last.pt`, including optimizer state, continues epoch numbering, preserves the best validation metric, and regenerates `eval.json` plus `grammar.json` after training.
