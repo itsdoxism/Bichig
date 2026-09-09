@@ -96,6 +96,18 @@ Track held-out validation perplexity and qualitative completion together. A lowe
 
 The model should gradually produce grammatical continuations before chat tuning begins.
 
+## Linguistic sanity benchmark
+
+Perplexity alone can improve while the model still mishandles Mongolian forms. Run the built-in minimal-pair benchmark after each meaningful checkpoint:
+
+```bash
+bichig-base-benchmark \
+  --checkpoint runs/base-v1/best.pt \
+  --out runs/base-v1/benchmark.json
+```
+
+It scores each grammatical/sensible sentence against a deliberately malformed counterpart using mean next-token NLL. Track overall accuracy, category accuracy and the NLL margin. The tiny smoke checkpoint is roughly chance-level; a real Base model should improve as corpus quality and scale increase. The suite is a sanity check, not a substitute for a reviewed linguistic benchmark.
+
 ## Source manifest rule
 
 Every bulk source should carry `name`, `path`, `license`, `kind`, `language`, `usage`, and `redistribute` metadata. Enabled sources with `unknown`/`unspecified` license are rejected by default. Use `--allow-unknown-license` only for an explicit private experiment; do not silently mix such data into a redistributable base corpus.
