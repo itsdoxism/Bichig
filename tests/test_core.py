@@ -104,3 +104,45 @@ def test_prepare_split_has_no_overlap():
     assert train_set.isdisjoint(test_set)
     assert valid_set.isdisjoint(test_set)
     assert train_set | valid_set | test_set == set(pairs)
+
+
+def test_jsonl_import_quarantines_conflicting_sources():
+    from bichig.import_jsonl import Row, clean_rows
+
+    rows = [
+        Row("a", "x", "one", 1),
+        Row("a", "x", "one", 2),
+        Row("b", "y", "one", 3),
+        Row("b", "z", "two", 1),
+        Row("c", "q", "two", 2),
+    ]
+    clean, conflicts, stats = clean_rows(rows)
+    assert clean == [("a", "x"), ("c", "q")]
+    assert conflicts == {"b": ["y", "z"]}
+    assert stats["raw_rows"] == 5
+    assert stats["exact_duplicates"] == 1
+    assert stats["conflicting_sources"] == 1
+    assert stats["clean_pairs"] == 2
+
+
+def test_generate_stops_repetition_loop():
+    tok = CharTokenizer.build(["a", "ᠠ"])
+    cfg = ModelConfig(
+        d_model=16,
+        nhead=4,
+        num_encoder_layers=1,
+        num_decoder_layers=1,
+        dim_feedforward=32,
+        dropout=0.0,
+        max_len=64,
+    )
+    model = BichigTransformer(len(tok), tok.pad_id, cfg)
+
+    with torch.no_grad():
+        for p in model.parameters():
+            p.zero_()
+        model.output.bias[tok.stoi["ᠠ"]] = 10.0
+
+    src = torch.tensor([tok.encode("a")], dtype=torch.long)
+    out = model.generate(src, tok.bos_id, tok.eos_id, max_new_tokens=50)
+    assert out.size(1) < 51
