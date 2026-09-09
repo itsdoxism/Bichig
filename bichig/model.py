@@ -48,8 +48,11 @@ class BichigTransformer(nn.Module):
     def forward(self, src: torch.Tensor, tgt_in: torch.Tensor) -> torch.Tensor:
         src_padding = src.eq(self.pad_id)
         tgt_padding = tgt_in.eq(self.pad_id)
-        tgt_mask = nn.Transformer.generate_square_subsequent_mask(
-            tgt_in.size(1), device=tgt_in.device
+        tgt_mask = torch.triu(
+            torch.ones(
+                tgt_in.size(1), tgt_in.size(1), dtype=torch.bool, device=tgt_in.device
+            ),
+            diagonal=1,
         )
         hidden = self.transformer(
             self._embed(src),
