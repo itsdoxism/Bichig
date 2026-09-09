@@ -29,6 +29,7 @@ bichig-base-manifest = "bichig.base_manifest:main"
 bichig-base-tugstugi-news = "bichig.base_tugstugi_news:main"
 bichig-base-treebank = "bichig.base_treebank:main"
 bichig-base-eval = "bichig.base_eval:main"
+bichig-base-benchmark = "bichig.base_benchmark:main"
 
 [tool.setuptools.packages.find]
 include = ["bichig*"]
