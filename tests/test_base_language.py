@@ -109,3 +109,28 @@ def test_base_benchmark_scores_text_longer_than_context_window():
     loss, count = sentence_nll(model, tok, text, torch.device("cpu"))
     assert count > cfg.max_len
     assert torch.isfinite(torch.tensor(loss))
+
+
+def test_base_run_resume_adds_last_checkpoint_when_present():
+    from argparse import Namespace
+    from bichig.base_run import build_commands
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        run_dir = td / "run"
+        run_dir.mkdir()
+        (run_dir / "last.pt").write_bytes(b"x")
+        a = Namespace(manifest="m.json", processed=str(td / "processed"), run_dir=str(run_dir), epochs=1,
+                      batch_size=2, seq_len=8, d_model=32, nhead=4, layers=1, ffn=64,
+                      vocab_lines=10, steps_per_epoch=3, resume=True, skip_corpus=True,
+                      allow_unknown_license=True)
+        commands = build_commands(a)
+        train = commands[0]
+        assert "--resume" in train and str(run_dir / "last.pt") in train
+        assert "--steps-per-epoch" in train
+
+
+def test_checkpoint_contains_optimizer_for_resume():
+    import inspect
+    import bichig.base_train as bt
+    src = inspect.getsource(bt.main)
+    assert '"optimizer": opt.state_dict()' in src
