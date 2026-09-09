@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "name": "example-open-source",
+      "path": "data/base/raw/demo.txt",
+      "license": "CC0-1.0",
+      "kind": "text",
+      "language": "mn-Cyrl",
+      "enabled": true,
+      "notes": "Example only; replace with real corpus sources."
+    },
+    {
+      "name": "example-unknown-license",
+      "path": "data/base/raw/not-used.txt",
+      "license": "unknown",
+      "kind": "news",
+      "language": "mn-Cyrl",
+      "enabled": false,
+      "notes": "Disabled until licensing is verified."
+    }
+  ]
+}
