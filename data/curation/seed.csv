@@ -1,1 +1,26 @@
 id,source,target,status,difficulty,category,provenance,license,reviewer,notes
+b000001,Улаанбаатар,ᠤᠯᠠᠭᠠᠨᠪᠠᠭᠠᠲᠤᠷ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000002,Дархан,ᠳᠠᠷᠬᠠᠨ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000003,Эрдэнэт,ᠡᠷᠳᠡᠨᠢᠲᠦ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000004,Архангай,ᠠᠷᠤᠬᠠᠩᠭᠠᠢ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000005,Баян-Өлгий,ᠪᠠᠶᠠᠨ ᠥᠯᠥᠭᠡᠢ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000006,Баянхонгор,ᠪᠠᠶᠠᠨᠬᠣᠩᠭᠣᠷ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000007,Булган,ᠪᠤᠯᠠᠭᠠᠨ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000008,Говь-Алтай,ᠭᠣᠪᠢ ᠠᠯᠲᠠᠢ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000009,Говьсүмбэр,ᠭᠣᠪᠢ ᠰᠦᠮᠪᠦᠷ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000010,Дархан-Уул,ᠳᠠᠷᠬᠠᠨ ᠠᠭᠤᠯᠠ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000011,Дорноговь,ᠳᠣᠷᠣᠨ᠎ᠠ ᠭᠣᠪᠢ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000012,Дорнод,ᠳᠣᠷᠣᠨᠠᠲᠤ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000013,Дундговь,ᠳᠤᠮᠳᠠ ᠭᠣᠪᠢ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000014,Завхан,ᠵᠠᠪᠬᠠᠨ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000015,Орхон,ᠣᠷᠬᠣᠨ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000016,Өвөрхангай,ᠥᠪᠥᠷᠬᠠᠩᠭᠠᠢ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000017,Өмнөговь,ᠡᠮᠦᠨᠡᠭᠣᠪᠢ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000018,Сүхбаатар,ᠰᠦᠬᠡᠪᠠᠭᠠᠲᠤᠷ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000019,Сэлэнгэ,ᠰᠡᠯᠡᠩᠭᠡ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000020,Төв,ᠲᠥᠪ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000021,Увс,ᠤᠪᠰᠤ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000022,Ховд,ᠬᠣᠪᠲᠣ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000023,Хөвсгөл,ᠬᠥᠪᠰᠦᠭᠦᠯ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000024,Хэнтий,ᠬᠡᠨᠲᠡᠢ,verified,easy,name,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
+b000025,Монгол бичиг,ᠮᠣᠩᠭᠣᠯ ᠪᠢᠴᠢᠭ,verified,easy,phrase,suwanpan/mongolian-script-text (Hugging Face),Apache-2.0,upstream curated dataset,Imported from upstream parallel corpus; selected unique non-conflicting row.
