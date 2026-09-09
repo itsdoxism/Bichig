@@ -16,11 +16,26 @@ Bichig Base should learn Mongolian from multiple text domains rather than one re
 | Mongolian Wikipedia dump | core explanatory text | enabled once dump is available locally |
 | Common Voice Mongolian transcripts | spoken/read sentence diversity | eligible with its declared license/provenance |
 | FLEURS / other open speech transcripts | sentence diversity | verify component license before enabling |
-| `tugstugi/mongolian-bert` 700M-word news archive | very large news corpus | **disabled by default** until the underlying dataset license is verified |
+| `tugstugi/mongolian-bert` 700M-word news archive | very large news corpus | **enabled only in `manifest.research.json`** with `license: unknown`, `usage: research-only`, `redistribute: false` |
 
-The existence of a public downloader is not treated as a license. Unknown-license bulk sources stay disabled in the manifest unless explicitly overridden for a private experiment.
+Unknown-license bulk sources are never silently mixed into the redistributable corpus. They require an explicit private-research override.
 
-## Pipeline
+## Research-only tugstugi news experiment
+
+The user explicitly opted into using the large tugstugi news corpus as a private training experiment even though the underlying news archive license is not stated. Bichig therefore keeps this source separate from redistributable corpora.
+
+```bash
+# Download + extract + reservoir-sample up to 100k sentences
+bichig-base-tugstugi-news --download --extract --max-sentences 100000
+
+# Explicit override is required because the source license is unknown
+bichig-base-corpus --manifest data/base/manifest.research.json \
+  --allow-unknown-license --out data/base/processed-research
+```
+
+The helper follows the public archive reference used by `tugstugi/mongolian-bert`, removes very short articles, drops the first/last sentence from sufficiently long articles as a simple metadata/noise heuristic, and reservoir-samples the requested number of sentences. The raw archive and extracted corpus should stay out of Git.
+
+## Standard pipeline
 
 ```bash
 bichig-base-manifest data/base/manifest.json
