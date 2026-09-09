@@ -82,4 +82,19 @@ class BichigTransformer(nn.Module):
             generated = torch.cat([generated, next_token], dim=1)
             if torch.all(next_token.squeeze(1).eq(eos_id)):
                 break
+
+            # Guard greedy decoding against obvious collapse loops on tiny models.
+            # Stop when every sample repeats the same short suffix 3 times.
+            if generated.size(1) >= 13:
+                collapsed = []
+                for row in generated:
+                    tail = row[-12:]
+                    collapsed.append(
+                        bool(
+                            torch.equal(tail[:4], tail[4:8])
+                            and torch.equal(tail[4:8], tail[8:12])
+                        )
+                    )
+                if all(collapsed):
+                    break
         return generated
