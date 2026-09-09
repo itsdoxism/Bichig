@@ -6,6 +6,8 @@ import re
 import unicodedata
 from pathlib import Path
 
+from .base_manifest import load_manifest
+
 CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
 LETTER_RE = re.compile(r"[^\W\d_]", re.UNICODE)
 WS_RE = re.compile(r"\s+")
@@ -114,7 +116,9 @@ def write_lines(path: Path, rows: list[str]) -> None:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Build a clean Cyrillic Mongolian corpus for Bichig Base")
-    p.add_argument("inputs", nargs="+")
+    p.add_argument("inputs", nargs="*")
+    p.add_argument("--manifest", help="JSON manifest of corpus sources with license metadata")
+    p.add_argument("--allow-unknown-license", action="store_true")
     p.add_argument("--out", default="data/base/processed")
     p.add_argument("--field", default="text", help="JSONL/CSV text field")
     p.add_argument("--min-chars", type=int, default=20)
@@ -129,7 +133,19 @@ def main() -> None:
     a = parse_args()
     raw = []
     per_source = {}
-    for name in a.inputs:
+    source_meta = []
+    input_paths = list(a.inputs)
+    if a.manifest:
+        for rec in load_manifest(a.manifest):
+            if not rec.enabled:
+                continue
+            if rec.license.strip().lower() in {"", "unknown", "unspecified"} and not a.allow_unknown_license:
+                raise SystemExit(f"source {rec.name!r} has unknown license; pass --allow-unknown-license to override")
+            input_paths.append(rec.path)
+            source_meta.append({"name": rec.name, "path": rec.path, "license": rec.license, "kind": rec.kind, "language": rec.language})
+    if not input_paths:
+        raise SystemExit("provide at least one input path or --manifest")
+    for name in input_paths:
         path = Path(name)
         rows = iter_texts(path, a.field)
         per_source[str(path)] = len(rows)
@@ -141,6 +157,7 @@ def main() -> None:
     write_lines(out / "valid.txt", valid)
     report = {
         "sources": per_source,
+        "source_metadata": source_meta,
         **stats,
         "train": len(train),
         "valid": len(valid),
