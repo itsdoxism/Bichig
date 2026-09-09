@@ -19,6 +19,9 @@ bichig-prepare-data = "bichig.prepare_data:main"
 bichig-smoke = "bichig.smoke:main"
 bichig-curate = "bichig.curate:main"
 bichig-import-jsonl = "bichig.import_jsonl:main"
+bichig-base-train = "bichig.base_train:main"
+bichig-base-generate = "bichig.base_generate:main"
+bichig-base-smoke = "bichig.base_smoke:main"
 
 [tool.setuptools.packages.find]
 include = ["bichig*"]
