@@ -39,7 +39,13 @@ def translate(
 ) -> str:
     device = torch.device(device)
     src = torch.tensor([tokenizer.encode(text)], dtype=torch.long, device=device)
-    limit = max_new_tokens if max_new_tokens is not None else config.max_len
+    # Traditional-script targets in this task are usually close to source length.
+    # A source-relative default prevents a weak model from emitting hundreds of
+    # repeated characters when it has not learned EOS yet.
+    limit = max_new_tokens if max_new_tokens is not None else min(
+        config.max_len,
+        max(16, len(text) * 2 + 16),
+    )
     output = model.generate(
         src,
         bos_id=tokenizer.bos_id,
