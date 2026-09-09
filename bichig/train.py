@@ -26,6 +26,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ffn", type=int, default=1024)
     p.add_argument("--dropout", type=float, default=0.1)
     p.add_argument("--max-len", type=int, default=256)
+    p.add_argument("--label-smoothing", type=float, default=0.1)
     return p.parse_args()
 
 
@@ -61,11 +62,11 @@ def main() -> None:
     )
 
     dataset = ParallelDataset(pairs, tokenizer, max_len=config.max_len)
-    val_size = int(len(dataset) * args.val_split)
-    if len(dataset) > 1:
-        val_size = max(1, min(val_size, len(dataset) - 1))
-    else:
+    if args.val_split <= 0 or len(dataset) <= 1:
         val_size = 0
+    else:
+        val_size = int(len(dataset) * args.val_split)
+        val_size = max(1, min(val_size, len(dataset) - 1))
     train_size = len(dataset) - val_size
     generator = torch.Generator().manual_seed(args.seed)
     train_set, val_set = random_split(dataset, [train_size, val_size], generator=generator)
@@ -75,7 +76,10 @@ def main() -> None:
 
     model = BichigTransformer(len(tokenizer), tokenizer.pad_id, config).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-    criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_id, label_smoothing=0.1)
+    criterion = nn.CrossEntropyLoss(
+        ignore_index=tokenizer.pad_id,
+        label_smoothing=args.label_smoothing,
+    )
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
