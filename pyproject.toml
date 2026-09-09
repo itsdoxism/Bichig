@@ -18,6 +18,7 @@ bichig-validate-data = "bichig.validate_data:main"
 bichig-prepare-data = "bichig.prepare_data:main"
 bichig-smoke = "bichig.smoke:main"
 bichig-curate = "bichig.curate:main"
+bichig-import-jsonl = "bichig.import_jsonl:main"
 
 [tool.setuptools.packages.find]
 include = ["bichig*"]
