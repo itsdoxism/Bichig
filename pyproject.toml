@@ -26,6 +26,7 @@ bichig-base-corpus = "bichig.base_corpus:main"
 bichig-base-wiki = "bichig.base_wiki:main"
 bichig-base-import = "bichig.base_import:main"
 bichig-base-manifest = "bichig.base_manifest:main"
+bichig-base-tugstugi-news = "bichig.base_tugstugi_news:main"
 
 [tool.setuptools.packages.find]
 include = ["bichig*"]
