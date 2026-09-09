@@ -13,7 +13,9 @@ from .tokenizer import CharTokenizer
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Train Bichig from random initialization")
-    p.add_argument("--data", required=True, help="UTF-8 TSV parallel corpus")
+    p.add_argument("--data", help="UTF-8 TSV corpus (legacy: internally split with --val-split)")
+    p.add_argument("--train-data", help="Explicit training TSV corpus")
+    p.add_argument("--valid-data", help="Explicit validation TSV corpus")
     p.add_argument("--out", default="runs/bichig-v0")
     p.add_argument("--epochs", type=int, default=20)
     p.add_argument("--batch-size", type=int, default=64)
@@ -49,7 +51,19 @@ def main() -> None:
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    pairs = read_pairs(args.data)
+    if args.train_data:
+        if args.data:
+            raise SystemExit("use either --data or --train-data, not both")
+        train_pairs = read_pairs(args.train_data)
+        valid_pairs = read_pairs(args.valid_data) if args.valid_data else []
+        pairs = train_pairs
+    elif args.data:
+        pairs = read_pairs(args.data)
+        train_pairs = None
+        valid_pairs = None
+    else:
+        raise SystemExit("one of --data or --train-data is required")
+
     tokenizer = CharTokenizer.build([p.source for p in pairs] + [p.target for p in pairs])
     config = ModelConfig(
         d_model=args.d_model,
@@ -61,18 +75,27 @@ def main() -> None:
         max_len=args.max_len,
     )
 
-    dataset = ParallelDataset(pairs, tokenizer, max_len=config.max_len)
-    if args.val_split <= 0 or len(dataset) <= 1:
-        val_size = 0
-    else:
-        val_size = int(len(dataset) * args.val_split)
-        val_size = max(1, min(val_size, len(dataset) - 1))
-    train_size = len(dataset) - val_size
-    generator = torch.Generator().manual_seed(args.seed)
-    train_set, val_set = random_split(dataset, [train_size, val_size], generator=generator)
     collate = make_collate_fn(tokenizer.pad_id)
-    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collate)
-    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, collate_fn=collate) if val_size else None
+    if train_pairs is not None:
+        train_set = ParallelDataset(train_pairs, tokenizer, max_len=config.max_len)
+        val_set = ParallelDataset(valid_pairs, tokenizer, max_len=config.max_len) if valid_pairs else None
+        train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collate)
+        val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, collate_fn=collate) if val_set else None
+        dataset_size = len(train_set)
+        val_size = len(val_set) if val_set else 0
+    else:
+        dataset = ParallelDataset(pairs, tokenizer, max_len=config.max_len)
+        if args.val_split <= 0 or len(dataset) <= 1:
+            val_size = 0
+        else:
+            val_size = int(len(dataset) * args.val_split)
+            val_size = max(1, min(val_size, len(dataset) - 1))
+        train_size = len(dataset) - val_size
+        generator = torch.Generator().manual_seed(args.seed)
+        train_set, val_set = random_split(dataset, [train_size, val_size], generator=generator)
+        train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collate)
+        val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, collate_fn=collate) if val_size else None
+        dataset_size = len(dataset)
 
     model = BichigTransformer(len(tokenizer), tokenizer.pad_id, config).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
@@ -86,7 +109,7 @@ def main() -> None:
     tokenizer.save(out / "vocab.json")
     best_val = float("inf")
 
-    print(f"device={device} pairs={len(dataset)} vocab={len(tokenizer)} parameters={sum(p.numel() for p in model.parameters()):,}")
+    print(f"device={device} train_pairs={dataset_size} valid_pairs={val_size} vocab={len(tokenizer)} parameters={sum(p.numel() for p in model.parameters()):,}")
 
     for epoch in range(1, args.epochs + 1):
         model.train()
