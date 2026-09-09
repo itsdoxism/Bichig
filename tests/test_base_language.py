@@ -76,3 +76,36 @@ def test_streaming_validation_loader_does_not_require_dataset_len():
         model = CausalBlockModel(len(tok), tok.pad_id, cfg)
         loss = evaluate_loss(model, loader, nn.CrossEntropyLoss(ignore_index=tok.pad_id), torch.device("cpu"))
         assert torch.isfinite(torch.tensor(loss))
+
+
+def test_base_benchmark_prefers_lower_nll_when_model_is_biased():
+    from bichig.base_benchmark import run_benchmark
+    from bichig.base_model import BaseConfig, CausalBlockModel
+    from bichig.base_tokenizer import HybridTokenizer
+
+    texts = ["Би номоо уншив.", "Би номын уншив."] * 4
+    tok = HybridTokenizer.build(texts, min_word_freq=1)
+    cfg = BaseConfig(d_model=16, nhead=4, layers=1, ffn=32, dropout=0.0, max_len=32)
+    model = CausalBlockModel(len(tok), tok.pad_id, cfg)
+    result = run_benchmark(
+        model, tok,
+        [{"category": "test", "good": "Би номоо уншив.", "bad": "Би номын уншив."}],
+        torch.device("cpu"),
+    )
+    assert result["probes"] == 1
+    assert 0.0 <= result["accuracy"] <= 1.0
+    assert "margin" in result["results"][0]
+
+
+def test_base_benchmark_scores_text_longer_than_context_window():
+    from bichig.base_benchmark import sentence_nll
+    from bichig.base_model import BaseConfig, CausalBlockModel
+    from bichig.base_tokenizer import HybridTokenizer
+
+    text = "Монгол хэл бол олон зууны түүхтэй бөгөөд хүмүүс өдөр бүр хэрэглэдэг хэл юм."
+    tok = HybridTokenizer.build([text], min_word_freq=1)
+    cfg = BaseConfig(d_model=16, nhead=4, layers=1, ffn=32, dropout=0.0, max_len=8)
+    model = CausalBlockModel(len(tok), tok.pad_id, cfg)
+    loss, count = sentence_nll(model, tok, text, torch.device("cpu"))
+    assert count > cfg.max_len
+    assert torch.isfinite(torch.tensor(loss))
