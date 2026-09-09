@@ -40,10 +40,38 @@ bichig-base-train \
 ```bash
 bichig-base-tugstugi-news --download --extract --max-sentences 100000
 bichig-base-corpus --manifest data/base/manifest.research.json --allow-unknown-license --out data/base/processed-research
-bichig-base-train --data data/base/processed-research/train.txt --valid-data data/base/processed-research/valid.txt --out runs/base-news-v1 --seq-len 128 --d-model 256 --nhead 8 --layers 6 --ffn 1024 --batch-size 32
+bichig-base-train \
+  --data data/base/processed-research/train.txt \
+  --valid-data data/base/processed-research/valid.txt \
+  --out runs/base-news-v1 \
+  --streaming \
+  --vocab-lines 200000 \
+  --seq-len 128 \
+  --d-model 256 \
+  --nhead 8 \
+  --layers 6 \
+  --ffn 1024 \
+  --batch-size 32
 ```
 
 This path is intentionally marked `research-only`; the raw news archive is not redistributed by Bichig while its underlying license remains unknown.
+
+## Large-corpus streaming
+
+For corpora that no longer fit comfortably in RAM, use `--streaming`. Bichig learns the tokenizer from a deterministic reservoir sample (`--vocab-lines`) and then packs fixed-length token windows directly from disk. The full tokenized corpus is never materialized in memory.
+
+```bash
+bichig-base-train \
+  --data data/base/processed/train.txt \
+  --valid-data data/base/processed/valid.txt \
+  --out runs/base-large-v1 \
+  --streaming \
+  --vocab-lines 200000 \
+  --seq-len 256 \
+  --batch-size 32
+```
+
+Use `--steps-per-epoch` for quick experiments on very large corpora. Streaming validation is supported as well.
 
 ## Data mix target
 
@@ -70,4 +98,4 @@ The model should gradually produce grammatical continuations before chat tuning 
 
 ## Source manifest rule
 
-Every bulk source should carry `name`, `path`, `license`, `kind`, `language`, `usage`, and `redistribute` metadata. Enabled sources with `unknown`/`unspecified` license are rejected by default. Use `--allow-unknown-license` only for an explicit private experiment.
+Every bulk source should carry `name`, `path`, `license`, `kind`, `language`, `usage`, and `redistribute` metadata. Enabled sources with `unknown`/`unspecified` license are rejected by default. Use `--allow-unknown-license` only for an explicit private experiment; do not silently mix such data into a redistributable base corpus.
