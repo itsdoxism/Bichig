@@ -89,3 +89,18 @@ def test_curation_status_and_audit():
         assert records[0].status == "verified"
         assert records[0].reviewer == "tester"
         cmd_audit(Namespace(file=str(path)))
+
+
+def test_prepare_split_has_no_overlap():
+    from bichig.prepare_data import split_pairs
+
+    pairs = [(f"src{i}", f"tgt{i}") for i in range(20)]
+    train, valid, test = split_pairs(pairs, valid_ratio=0.2, test_ratio=0.2, seed=422)
+    train_set, valid_set, test_set = set(train), set(valid), set(test)
+    assert len(train) == 12
+    assert len(valid) == 4
+    assert len(test) == 4
+    assert train_set.isdisjoint(valid_set)
+    assert train_set.isdisjoint(test_set)
+    assert valid_set.isdisjoint(test_set)
+    assert train_set | valid_set | test_set == set(pairs)
