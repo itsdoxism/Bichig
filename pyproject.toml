@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bichig"
 version = "0.0.1"
-description = "From-scratch neural Cyrillic to Traditional Mongolian script conversion"
+description = "From-scratch Mongolian language and script AI"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["torch>=2.2"]
@@ -31,6 +31,7 @@ bichig-base-treebank = "bichig.base_treebank:main"
 bichig-base-eval = "bichig.base_eval:main"
 bichig-base-benchmark = "bichig.base_benchmark:main"
 bichig-base-run = "bichig.base_run:main"
+bichig-base-tokenizer-stats = "bichig.base_tokenizer_stats:main"
 
 [tool.setuptools.packages.find]
 include = ["bichig*"]
