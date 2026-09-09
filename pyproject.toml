@@ -23,6 +23,7 @@ bichig-base-train = "bichig.base_train:main"
 bichig-base-generate = "bichig.base_generate:main"
 bichig-base-smoke = "bichig.base_smoke:main"
 bichig-base-corpus = "bichig.base_corpus:main"
+bichig-base-wiki = "bichig.base_wiki:main"
 
 [tool.setuptools.packages.find]
 include = ["bichig*"]
