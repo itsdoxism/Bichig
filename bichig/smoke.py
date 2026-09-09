@@ -43,11 +43,12 @@ def main() -> None:
         "--layers", str(args.layers),
         "--ffn", str(args.ffn),
         "--dropout", "0",
+        "--label-smoothing", "0",
         "--max-len", str(args.max_len),
     ])
     run([
         sys.executable, "-m", "bichig.evaluate",
-        "--checkpoint", str(out / "best.pt"),
+        "--checkpoint", str(out / "last.pt"),
         "--data", args.data,
     ])
 
