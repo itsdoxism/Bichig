@@ -13,6 +13,8 @@ class SourceRecord:
     language: str = "mn-Cyrl"
     enabled: bool = True
     notes: str = ""
+    usage: str = "general"
+    redistribute: bool = True
 
     @classmethod
     def from_dict(cls, row: dict):
