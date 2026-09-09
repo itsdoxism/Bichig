@@ -105,6 +105,7 @@ def parse_args():
     p.add_argument("--dropout", type=float, default=0.1)
     p.add_argument("--min-word-freq", type=int, default=2)
     p.add_argument("--seed", type=int, default=422)
+    p.add_argument("--resume", help="resume model/optimizer state from an existing checkpoint")
     return p.parse_args()
 
 
@@ -156,12 +157,33 @@ def main():
         if not vocab_texts:
             raise SystemExit("training corpus is empty")
 
-    tok = HybridTokenizer.build(vocab_texts, min_word_freq=a.min_word_freq)
+    resume_ckpt = None
+    if a.resume:
+        resume_ckpt = torch.load(a.resume, map_location="cpu")
+        tok = HybridTokenizer(resume_ckpt["vocab"])
+    else:
+        tok = HybridTokenizer.build(vocab_texts, min_word_freq=a.min_word_freq)
     train_loader, valid_loader, stats = build_loaders(a, tok)
 
-    cfg = BaseConfig(d_model=a.d_model, nhead=a.nhead, layers=a.layers, ffn=a.ffn, dropout=a.dropout, max_len=a.seq_len)
+    if resume_ckpt:
+        cfg = BaseConfig(**resume_ckpt["config"])
+        if cfg.max_len != a.seq_len:
+            raise SystemExit(f"--seq-len={a.seq_len} must match resumed checkpoint max_len={cfg.max_len}")
+    else:
+        cfg = BaseConfig(d_model=a.d_model, nhead=a.nhead, layers=a.layers, ffn=a.ffn, dropout=a.dropout, max_len=a.seq_len)
     model = CausalBlockModel(len(tok), tok.pad_id, cfg).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr)
+    start_epoch = 1
+    best_metric = float("inf")
+    if resume_ckpt:
+        model.load_state_dict(resume_ckpt["model"])
+        if "optimizer" in resume_ckpt:
+            opt.load_state_dict(resume_ckpt["optimizer"])
+            for group in opt.param_groups:
+                group["lr"] = a.lr
+        start_epoch = int(resume_ckpt.get("epoch", 0)) + 1
+        best_metric = float(resume_ckpt.get("best_val_loss", resume_ckpt.get("val_loss", float("inf"))))
+        print(f"resumed={a.resume} from_epoch={start_epoch-1} best_val_loss={best_metric:.4f}")
     loss_fn = nn.CrossEntropyLoss(ignore_index=tok.pad_id)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -170,8 +192,7 @@ def main():
     detail = "streaming=true" if a.streaming else " ".join(f"{k}={v}" for k, v in stats.items())
     print(f"device={device} {detail} vocab={len(tok)} params={sum(p.numel() for p in model.parameters()):,}")
 
-    best_metric = float("inf")
-    for epoch in range(1, a.epochs + 1):
+    for epoch in range(start_epoch, start_epoch + a.epochs):
         model.train()
         total = 0.0
         steps = 0
@@ -194,7 +215,8 @@ def main():
         print(f"epoch={epoch:03d} steps={steps} loss={avg:.4f} ppl={math_exp(avg):.2f} val_loss={val:.4f} val_ppl={math_exp(val):.2f}")
         ckpt = {
             "model": model.state_dict(), "config": cfg.to_dict(), "vocab": tok.itos,
-            "epoch": epoch, "loss": avg, "val_loss": val,
+            "epoch": epoch, "loss": avg, "val_loss": val, "best_val_loss": min(best_metric, val),
+            "optimizer": opt.state_dict(),
             "training": {"streaming": a.streaming, "seq_len": a.seq_len, "vocab_lines": a.vocab_lines},
         }
         torch.save(ckpt, out / "last.pt")
