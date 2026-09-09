@@ -47,7 +47,14 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e .
 
+# Legacy/simple mode: one file with an internal validation split
 bichig-train --data data/train.tsv --out runs/bichig-v0
+
+# Preferred experiment mode: deterministic held-out splits
+bichig-prepare-data data/seed.tsv --out data/processed --valid-ratio 0.10 --test-ratio 0.10
+bichig-train --train-data data/processed/train.tsv --valid-data data/processed/valid.tsv --out runs/bichig-v0
+bichig-eval --checkpoint runs/bichig-v0/best.pt --data data/processed/test.tsv
+
 bichig-infer --checkpoint runs/bichig-v0/best.pt --text "Монгол хэл"
 ```
 
