@@ -32,8 +32,15 @@ bichig-base-train \
   --nhead 8 \
   --layers 6 \
   --ffn 1024 \
-  --batch-size 32
+  --batch-size 8 \
+  --grad-accum 4 \
+  --lr 3e-4 \
+  --weight-decay 0.1 \
+  --warmup-steps 100 \
+  --cosine-steps 2000
 ```
+
+`batch-size × grad-accum` is the effective batch size in sequences. Warmup is counted in optimizer updates, not micro-batches. After warmup, cosine decay approaches `--lr × --min-lr-ratio` (default 0.1). Set `--cosine-steps 0` to keep a constant LR after warmup.
 
 ## Private research recipe with tugstugi news
 
@@ -51,7 +58,10 @@ bichig-base-train \
   --nhead 8 \
   --layers 6 \
   --ffn 1024 \
-  --batch-size 32
+  --batch-size 8 \
+  --grad-accum 4 \
+  --warmup-steps 100 \
+  --cosine-steps 2000
 ```
 
 This path is intentionally marked `research-only`; the raw news archive is not redistributed by Bichig while its underlying license remains unknown.
@@ -68,10 +78,32 @@ bichig-base-train \
   --streaming \
   --vocab-lines 200000 \
   --seq-len 256 \
-  --batch-size 32
+  --batch-size 8 \
+  --grad-accum 4
 ```
 
-Use `--steps-per-epoch` for quick experiments on very large corpora. Streaming validation is supported as well.
+Use `--steps-per-epoch` for quick experiments on very large corpora. Streaming validation is supported as well. Checkpoints save optimizer state, global optimizer-update count, LR schedule settings and the best validation loss, so `--resume` can continue the same run without resetting the schedule.
+
+## Tokenizer diagnostics
+
+Do not compare only vocabulary size. Measure how efficiently and safely the tokenizer represents held-out Mongolian text:
+
+```bash
+bichig-base-tokenizer-stats \
+  --vocab runs/base-v1/vocab.json \
+  --data data/base/processed/valid.txt \
+  --out runs/base-v1/tokenizer.json
+```
+
+Track at least:
+
+- unknown-token rate (should be near zero on normal Cyrillic Mongolian)
+- tokens per word
+- tokens per non-space character
+- whole-word / suffix / character / punctuation usage
+- the learned suffix inventory
+
+A tokenizer that simply memorizes many whole words can look compact on training text while generalizing poorly, so always inspect held-out statistics.
 
 ## Data mix target
 
@@ -114,7 +146,7 @@ Every bulk source should carry `name`, `path`, `license`, `kind`, `language`, `u
 
 ## One-command research experiment
 
-After the research manifest points at available raw text, run the whole clean → train → eval → grammar-benchmark flow with:
+After the research manifest points at available raw text, run the whole clean → train → tokenizer-stats → eval → grammar-benchmark flow with:
 
 ```bash
 bichig-base-run \
@@ -125,4 +157,4 @@ bichig-base-run \
   --steps-per-epoch 1000
 ```
 
-Resume an interrupted or continued experiment with `--resume`. Bichig reuses `last.pt`, including optimizer state, continues epoch numbering, preserves the best validation metric, and regenerates `eval.json` plus `grammar.json` after training.
+The runner defaults to `batch-size=8`, `grad-accum=4`, linear warmup and cosine LR decay. Resume an interrupted or continued experiment with `--resume`. Bichig reuses `last.pt`, including optimizer state and global update count, continues epoch numbering, preserves the best validation metric, and regenerates `tokenizer.json`, `eval.json` and `grammar.json` after training.
