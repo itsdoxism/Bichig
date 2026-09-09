@@ -22,6 +22,7 @@ bichig-import-jsonl = "bichig.import_jsonl:main"
 bichig-base-train = "bichig.base_train:main"
 bichig-base-generate = "bichig.base_generate:main"
 bichig-base-smoke = "bichig.base_smoke:main"
+bichig-base-corpus = "bichig.base_corpus:main"
 
 [tool.setuptools.packages.find]
 include = ["bichig*"]
