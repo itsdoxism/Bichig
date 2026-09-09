@@ -73,3 +73,22 @@ The first metrics are:
 - **CER** — character error rate using Levenshtein edit distance.
 
 These are intentionally simple baseline metrics. Later versions should add word/morpheme-aware evaluation and a manually reviewed linguistic benchmark.
+
+## First full-corpus experiment
+
+The first larger experiment uses the 177-row Apache-2.0 `suwanpan/mongolian-script-text` dataset snapshot. The raw snapshot is kept locally under `data/raw/hf_suwanpan/`, while the reproducible import report and cleaned/split outputs can be committed independently.
+
+```bash
+bichig-import-jsonl data/raw/hf_suwanpan/*.jsonl \
+  --out data/full-clean.tsv \
+  --conflicts data/full-conflicts.json \
+  --report data/full-import-report.json
+
+bichig-prepare-data data/full-clean.tsv \
+  --out data/full-processed \
+  --valid-ratio 0.10 \
+  --test-ratio 0.10 \
+  --seed 422
+```
+
+For the current snapshot, 177 raw rows become 154 unique pairs. Three Cyrillic sources have conflicting Traditional-script targets; quarantining all of those mappings leaves 147 clean pairs, split into 117 train / 15 valid / 15 test.
